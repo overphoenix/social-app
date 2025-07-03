@@ -67,6 +67,7 @@ export type MetricEvents = {
     backgroundCount: number
   }
   'signup:handleTaken': {}
+  'signup:handleReserved': {}
   'signin:hostingProviderPressed': {
     hostingProviderDidChange: boolean
   }
