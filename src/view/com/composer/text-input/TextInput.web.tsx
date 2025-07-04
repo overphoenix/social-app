@@ -1,4 +1,11 @@
-import React, {useRef} from 'react'
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import {StyleSheet, View} from 'react-native'
 import Animated, {FadeIn, FadeOut} from 'react-native-reanimated'
 import {AppBskyRichtextFacet, RichText} from '@atproto/api'
@@ -26,55 +33,33 @@ import {atoms as a, useAlf} from '#/alf'
 import {normalizeTextStyles} from '#/alf/typography'
 import {Portal} from '#/components/Portal'
 import {Text} from '#/components/Typography'
-import {createSuggestion} from './web/Autocomplete'
+import {type TextInputProps} from './TextInput.types'
+import {type AutocompleteRef, createSuggestion} from './web/Autocomplete'
 import {type Emoji} from './web/EmojiPicker'
 import {LinkDecorator} from './web/LinkDecorator'
 import {TagDecorator} from './web/TagDecorator'
 
-export interface TextInputRef {
-  focus: () => void
-  blur: () => void
-  getCursorPosition: () => DOMRect | undefined
-}
-
-interface TextInputProps {
-  richtext: RichText
-  placeholder: string
-  suggestedLinks: Set<string>
-  webForceMinHeight: boolean
-  hasRightPadding: boolean
-  isActive: boolean
-  setRichText: (v: RichText | ((v: RichText) => RichText)) => void
-  onPhotoPasted: (uri: string) => void
-  onPressPublish: (richtext: RichText) => void
-  onNewLink: (uri: string) => void
-  onError: (err: string) => void
-  onFocus: () => void
-}
-
-export const TextInput = React.forwardRef(function TextInputImpl(
-  {
-    richtext,
-    placeholder,
-    webForceMinHeight,
-    hasRightPadding,
-    isActive,
-    setRichText,
-    onPhotoPasted,
-    onPressPublish,
-    onNewLink,
-    onFocus,
-  }: // onError, TODO
-  TextInputProps,
+export function TextInput({
   ref,
-) {
+  richtext,
+  placeholder,
+  webForceMinHeight,
+  hasRightPadding,
+  isActive,
+  setRichText,
+  onPhotoPasted,
+  onPressPublish,
+  onNewLink,
+  onFocus,
+}: TextInputProps) {
   const {theme: t, fonts} = useAlf()
   const autocomplete = useActorAutocompleteFn()
   const modeClass = useColorSchemeStyle('ProseMirror-light', 'ProseMirror-dark')
 
-  const [isDropping, setIsDropping] = React.useState(false)
+  const [isDropping, setIsDropping] = useState(false)
+  const autocompleteRef = useRef<AutocompleteRef>(null)
 
-  const extensions = React.useMemo(
+  const extensions = useMemo(
     () => [
       Document,
       LinkDecorator,
@@ -83,7 +68,7 @@ export const TextInput = React.forwardRef(function TextInputImpl(
         HTMLAttributes: {
           class: 'mention',
         },
-        suggestion: createSuggestion({autocomplete}),
+        suggestion: createSuggestion({autocomplete, autocompleteRef}),
       }),
       Paragraph,
       Placeholder.configure({
@@ -96,7 +81,7 @@ export const TextInput = React.forwardRef(function TextInputImpl(
     [autocomplete, placeholder],
   )
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isActive) {
       return
     }
@@ -106,7 +91,7 @@ export const TextInput = React.forwardRef(function TextInputImpl(
     }
   }, [onPressPublish, isActive])
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isActive) {
       return
     }
@@ -116,7 +101,7 @@ export const TextInput = React.forwardRef(function TextInputImpl(
     }
   }, [isActive, onPhotoPasted])
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isActive) {
       return
     }
@@ -269,13 +254,13 @@ export const TextInput = React.forwardRef(function TextInputImpl(
     [modeClass],
   )
 
-  const onEmojiInserted = React.useCallback(
+  const onEmojiInserted = useCallback(
     (emoji: Emoji) => {
       editor?.chain().focus().insertContent(emoji.native).run()
     },
     [editor],
   )
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isActive) {
       return
     }
@@ -285,7 +270,7 @@ export const TextInput = React.forwardRef(function TextInputImpl(
     }
   }, [onEmojiInserted, isActive])
 
-  React.useImperativeHandle(ref, () => ({
+  useImperativeHandle(ref, () => ({
     focus: () => {
       editor?.chain().focus()
     },
@@ -296,9 +281,10 @@ export const TextInput = React.forwardRef(function TextInputImpl(
       const pos = editor?.state.selection.$anchor.pos
       return pos ? editor?.view.coordsAtPos(pos) : undefined
     },
+    maybeClosePopup: () => autocompleteRef.current?.maybeClose() ?? false,
   }))
 
-  const inputStyle = React.useMemo(() => {
+  const inputStyle = useMemo(() => {
     const style = normalizeTextStyles(
       [a.text_lg, a.leading_snug, t.atoms.text],
       {
@@ -355,7 +341,7 @@ export const TextInput = React.forwardRef(function TextInputImpl(
       )}
     </>
   )
-})
+}
 
 function editorJsonToText(
   json: JSONContent,
